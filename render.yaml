@@ -1,0 +1,14 @@
+# Sistema de Registro de Deportistas - Kronos
+
+Aplicación web para registro y gestión de deportistas con exportación a Excel.
+
+## Despliegue en Render
+
+Esta aplicación está configurada para desplegarse en Render.com.
+
+### Variables de Entorno
+- `PORT`: Puerto del servidor (automático en Render)
+
+### Comandos
+- Build: `npm install`
+- Start: `npm start`
