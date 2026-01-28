@@ -1,9 +1,15 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { dbOperations } from './database.js';
 import ExcelJS from 'exceljs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+
+// Load environment variables
+// Load environment variables
+// dotenv.config(); // Loaded via node -r dotenv/config
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,9 +25,9 @@ app.use(express.static('public'));
 // API Routes
 
 // Get all athletes
-app.get('/api/athletes', (req, res) => {
+app.get('/api/athletes', async (req, res) => {
     try {
-        const athletes = dbOperations.getAllAthletes();
+        const athletes = await dbOperations.getAllAthletes();
         res.json(athletes);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -29,9 +35,9 @@ app.get('/api/athletes', (req, res) => {
 });
 
 // Get config
-app.get('/api/config', (req, res) => {
+app.get('/api/config', async (req, res) => {
     try {
-        const config = dbOperations.getConfig();
+        const config = await dbOperations.getConfig();
         res.json(config);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -39,10 +45,10 @@ app.get('/api/config', (req, res) => {
 });
 
 // Update config
-app.put('/api/config', (req, res) => {
+app.put('/api/config', async (req, res) => {
     try {
         const { deporte, entidad } = req.body;
-        dbOperations.updateConfig(deporte, entidad);
+        await dbOperations.updateConfig(deporte, entidad);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -50,9 +56,9 @@ app.put('/api/config', (req, res) => {
 });
 
 // Add new athlete
-app.post('/api/athletes', (req, res) => {
+app.post('/api/athletes', async (req, res) => {
     try {
-        const result = dbOperations.addAthlete(req.body);
+        const result = await dbOperations.addAthlete(req.body);
         res.json({ id: result.lastInsertRowid, success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -60,9 +66,9 @@ app.post('/api/athletes', (req, res) => {
 });
 
 // Update athlete
-app.put('/api/athletes/:id', (req, res) => {
+app.put('/api/athletes/:id', async (req, res) => {
     try {
-        dbOperations.updateAthlete(req.params.id, req.body);
+        await dbOperations.updateAthlete(req.params.id, req.body);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -70,9 +76,9 @@ app.put('/api/athletes/:id', (req, res) => {
 });
 
 // Delete athlete
-app.delete('/api/athletes/:id', (req, res) => {
+app.delete('/api/athletes/:id', async (req, res) => {
     try {
-        dbOperations.deleteAthlete(req.params.id);
+        await dbOperations.deleteAthlete(req.params.id);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -82,8 +88,8 @@ app.delete('/api/athletes/:id', (req, res) => {
 // Export to Excel
 app.get('/api/export', async (req, res) => {
     try {
-        const athletes = dbOperations.getAllAthletes();
-        const config = dbOperations.getConfig();
+        const athletes = await dbOperations.getAllAthletes();
+        const config = await dbOperations.getConfig();
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Deportistas');
@@ -182,5 +188,5 @@ app.get('/api/export', async (req, res) => {
 // Start server
 app.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-    console.log(`📊 Base de datos: data.json`);
+    console.log(`📊 Base de datos: ${process.env.MONGODB_URI ? 'MongoDB Atlas' : 'MongoDB Local'}`);
 });

@@ -1,102 +1,105 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// MongoDB Connection
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/kronos-deportistas';
 
-const DB_FILE = path.join(__dirname, 'data.json');
+let isConnected = false;
 
-// Initialize database file
-function initDB() {
-  if (!fs.existsSync(DB_FILE)) {
-    const initialData = {
-      config: {
-        deporte: '',
-        entidad: ''
-      },
-      athletes: []
-    };
-    fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2));
+export async function connectDB() {
+  if (isConnected) {
+    return;
+  }
+
+  try {
+    console.log('🔌 Intentando conectar a:', MONGODB_URI);
+    await mongoose.connect(MONGODB_URI);
+    isConnected = true;
+    console.log('✅ Conectado a MongoDB');
+  } catch (error) {
+    console.error('❌ Error conectando a MongoDB:', error.message);
+    throw error;
   }
 }
 
-// Read database
-function readDB() {
-  initDB();
-  const data = fs.readFileSync(DB_FILE, 'utf8');
-  return JSON.parse(data);
-}
+// Config Schema
+const configSchema = new mongoose.Schema({
+  deporte: { type: String, default: '' },
+  entidad: { type: String, default: '' }
+}, { timestamps: true });
 
-// Write database
-function writeDB(data) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-}
+// Athlete Schema
+const athleteSchema = new mongoose.Schema({
+  nombre_apellido: { type: String, required: true },
+  dni: { type: String, required: true },
+  telefono: { type: String, default: '' },
+  obra_social: { type: String, default: '' },
+  horarios: { type: String, default: '' }
+}, { timestamps: true });
+
+const Config = mongoose.model('Config', configSchema);
+const Athlete = mongoose.model('Athlete', athleteSchema);
 
 // Database operations
 export const dbOperations = {
   // Get all athletes
-  getAllAthletes: () => {
-    const db = readDB();
-    return db.athletes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  getAllAthletes: async () => {
+    await connectDB();
+    return await Athlete.find().sort({ createdAt: -1 }).lean();
   },
 
-  // Get config (deporte, entidad)
-  getConfig: () => {
-    const db = readDB();
-    return db.config;
+  // Get config
+  getConfig: async () => {
+    await connectDB();
+    let config = await Config.findOne().lean();
+    if (!config) {
+      config = await Config.create({ deporte: '', entidad: '' });
+    }
+    return { deporte: config.deporte, entidad: config.entidad };
   },
 
   // Update config
-  updateConfig: (deporte, entidad) => {
-    const db = readDB();
-    db.config = { deporte, entidad };
-    writeDB(db);
+  updateConfig: async (deporte, entidad) => {
+    await connectDB();
+    await Config.findOneAndUpdate(
+      {},
+      { deporte, entidad },
+      { upsert: true, new: true }
+    );
     return { success: true };
   },
 
   // Add new athlete
-  addAthlete: (data) => {
-    const db = readDB();
-    const newAthlete = {
-      id: db.athletes.length > 0 ? Math.max(...db.athletes.map(a => a.id)) + 1 : 1,
+  addAthlete: async (data) => {
+    await connectDB();
+    const athlete = await Athlete.create({
       nombre_apellido: data.nombre_apellido,
       dni: data.dni,
       telefono: data.telefono || '',
       obra_social: data.obra_social || '',
-      horarios: data.horarios || '',
-      created_at: new Date().toISOString()
-    };
-    db.athletes.push(newAthlete);
-    writeDB(db);
-    return { lastInsertRowid: newAthlete.id };
+      horarios: data.horarios || ''
+    });
+    return { lastInsertRowid: athlete._id };
   },
 
   // Update athlete
-  updateAthlete: (id, data) => {
-    const db = readDB();
-    const index = db.athletes.findIndex(a => a.id === parseInt(id));
-    if (index !== -1) {
-      db.athletes[index] = {
-        ...db.athletes[index],
-        nombre_apellido: data.nombre_apellido,
-        dni: data.dni,
-        telefono: data.telefono || '',
-        obra_social: data.obra_social || '',
-        horarios: data.horarios || ''
-      };
-      writeDB(db);
-    }
+  updateAthlete: async (id, data) => {
+    await connectDB();
+    await Athlete.findByIdAndUpdate(id, {
+      nombre_apellido: data.nombre_apellido,
+      dni: data.dni,
+      telefono: data.telefono || '',
+      obra_social: data.obra_social || '',
+      horarios: data.horarios || ''
+    });
     return { success: true };
   },
 
   // Delete athlete
-  deleteAthlete: (id) => {
-    const db = readDB();
-    db.athletes = db.athletes.filter(a => a.id !== parseInt(id));
-    writeDB(db);
+  deleteAthlete: async (id) => {
+    await connectDB();
+    await Athlete.findByIdAndDelete(id);
     return { success: true };
   }
 };
 
-export default { dbOperations };
+export default { dbOperations, connectDB };
